@@ -242,3 +242,41 @@ it('effect function of the React adapter works', () => {
   expect(mountFn).toBeCalledTimes(1)
   expect(unmountFn).toBeCalledTimes(1)
 })
+
+it('effect function of the React adapter tracks dependencies', () => {
+  const a = create(0)
+  const b = create(1)
+  const logFn = jest.fn()
+  const cleanupFn = jest.fn()
+  function App() {
+    useSetup((_, { effect }) => {
+      effect(() => {
+        logFn(a.value + a.value + b.value)
+        return cleanupFn
+      })
+    })
+    return <div>hello!</div>
+  }
+
+  const { unmount } = render(<App />)
+
+  expect(logFn).toBeCalledTimes(1)
+  expect(cleanupFn).not.toBeCalled()
+
+  a.set(2)
+
+  expect(logFn).toBeCalledTimes(2)
+  expect(logFn).toBeCalledWith(5)
+  expect(cleanupFn).toBeCalledTimes(1)
+
+  b.set(3)
+
+  expect(logFn).toBeCalledTimes(3)
+  expect(logFn).toBeCalledWith(7)
+  expect(cleanupFn).toBeCalledTimes(2)
+
+  unmount()
+
+  expect(logFn).toBeCalledTimes(3)
+  expect(cleanupFn).toBeCalledTimes(3)
+})

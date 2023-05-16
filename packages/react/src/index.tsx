@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'use-sync-external-store/shim'
 import React, { useEffect, useLayoutEffect, useRef, useDebugValue, Context } from 'react'
 import { Atom, Actions, create } from 'xoid'
+import { createEvent, track } from 'xoid/src/internal/lite'
 
 // For server-side rendering: https://github.com/react-spring/zustand/pull/34
 const useIsoLayoutEffect = window === undefined ? useEffect : useLayoutEffect
@@ -9,18 +10,6 @@ const useConstant = <T extends any>(fn: () => T): T => {
   const ref = useRef<{ c: T }>()
   if (!ref.current) ref.current = { c: fn() }
   return ref.current.c
-}
-
-export const createEvent = () => {
-  const fns = new Set<Function>()
-  const add = (fn: Function) => {
-    fns.add(fn)
-  }
-  const fire = () => {
-    fns.forEach((fn) => fn())
-    fns.clear()
-  }
-  return { add, fire }
 }
 
 export type ReactAdapter = {
@@ -41,11 +30,16 @@ const useReactAdapter = (): ReactAdapter => {
       adapter: {
         read: <T,>(context: Context<T>): T =>
           reactInternals.ReactCurrentDispatcher.current.readContext(context),
-        effect: (fn: React.EffectCallback) =>
-          m.add(() => {
-            const result = fn()
-            if (typeof result === 'function') u.add(result)
-          }),
+        effect: (fn: React.EffectCallback) => {
+          const e = createEvent()
+          const update = () => {
+            e.fire()
+            const result = track(fn, (atom) => e.add(atom.subscribe(update)))
+            if (typeof result === 'function') e.add(result)
+          }
+          m.add(update)
+          u.add(e.fire)
+        },
       },
       m,
       u,
