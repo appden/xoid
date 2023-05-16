@@ -9,6 +9,7 @@ Object {
     "focus": [Function],
     "get": [Function],
     "map": [Function],
+    "peek": [Function],
     "set": [Function],
     "subscribe": [Function],
     "update": [Function],

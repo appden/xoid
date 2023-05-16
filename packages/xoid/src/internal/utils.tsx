@@ -1,4 +1,4 @@
-import { createBaseApi, createEvent, createInternal, Internal } from './lite'
+import { createBaseApi, createEvent, createInternal, track, Internal } from './lite'
 import { Atom, GetState } from '../types'
 
 export const INTERNAL = Symbol()
@@ -35,9 +35,7 @@ export const createGetState =
       return read()
     }
     // @ts-ignore
-    add(read.subscribe(updateState))
-    // @ts-ignore
-    return read.value
+    return read.get()
   }
 
 export const createSelector = <T,>(internal: Internal<T>, init: (get: GetState) => T) => {
@@ -45,16 +43,22 @@ export const createSelector = <T,>(internal: Internal<T>, init: (get: GetState) 
   const { add, fire } = createEvent()
 
   let isPending = true
-  const getter = createGetState(() => {
+  const updateState = () => {
     if (listeners.size) evaluate()
     else isPending = true
-  }, add)
+  }
+  const getter = createGetState(updateState, add)
 
   const evaluate = () => {
     // cleanup previous subscriptions
     fire()
     isPending = false
-    set(init(getter))
+    set(
+      track(
+        () => init(getter),
+        (atom) => add(atom.subscribe(updateState))
+      )
+    )
   }
 
   internal.get = () => {

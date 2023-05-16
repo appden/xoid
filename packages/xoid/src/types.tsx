@@ -3,6 +3,7 @@ type Destructor = () => void | { [voidOnly]: never }
 
 export type Atom<T> = {
   value: T
+  peek(): T
   get(): T
   set(state: T): void
   update(fn: (state: T) => T): void
@@ -16,6 +17,7 @@ export type Atom<T> = {
 
 export type Stream<T> = {
   value: T | undefined
+  peek(): T | undefined
   get(): T | undefined
   set(state: T): void
   update(fn: (state: T | undefined) => T): void

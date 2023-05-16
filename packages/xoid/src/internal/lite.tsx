@@ -3,6 +3,7 @@
 
 export type LiteAtom<T> = {
   value: T
+  peek(): T
   get(): T
   set(state: T): void
   update(fn: (state: T) => T): void
@@ -63,11 +64,28 @@ const subscribeInternal = <T,>(
   }
 }
 
+let currentTracker: ((atom: LiteAtom<any>) => void) | null = null
+
+export const track = <T,>(getter: () => T, tracker: (atom: LiteAtom<any>) => void) => {
+  const tracked = new Set<LiteAtom<any>>()
+  const prevTracker = currentTracker
+  currentTracker = (atom) => {
+    if (tracked.has(atom)) return
+    tracked.add(atom)
+    tracker(atom)
+  }
+  try {
+    return getter()
+  } finally {
+    currentTracker = prevTracker
+  }
+}
+
 export const createInternal = <T,>(value: T, send?: () => void): Internal<T> => {
   const listeners = new Set<() => void>()
   return {
     listeners,
-    get: () => value as T,
+    get: () => value,
     set: (nextValue: T) => {
       if (value === nextValue) return
       value = nextValue
@@ -87,12 +105,16 @@ export const createBaseApi = <T,>(internal: Internal<T>) => {
   // It lets enhanced atoms work.
   const api: LiteAtom<T> = {
     get value() {
-      return get()
+      return api.get()
     },
     set value(item) {
       api.set(item)
     },
-    get,
+    peek: get,
+    get: () => {
+      currentTracker?.(api)
+      return get()
+    },
     set,
     update: (fn: any) => api.set(fn(get())),
     subscribe: (item) => subscribeInternal(subscribe, item, get),
